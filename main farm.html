@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SAATHI Smart Farm</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:#f4fdf7;
+  color:#1f2937;
+}
+
+.header{
+  background:#22c55e;
+  color:white;
+  padding:20px;
+  font-size:24px;
+  text-align:center;
+  font-weight:bold;
+}
+
+/* MAIN LAYOUT */
+.main{
+  display:flex;
+  gap:20px;
+  padding:20px;
+}
+
+/* GRID 3x2 */
+.grid{
+  display:grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows:180px;
+  gap:20px;
+  flex:3;
+}
+
+/* CAMERA SIDE */
+.side{
+  flex:1;
+  display:flex;
+  gap: 100px;
+  margin: 1px;
+  width: 400px;
+}
+#cam{
+  height:300px;
+  object-fit:cover;
+}
+
+/* CARD */
+.card{
+  background:white;
+  padding:20px;
+  border-radius:15px;
+  box-shadow:0 5px 15px rgba(0,0,0,0.1);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+
+.card h3{
+  color:#16a34a;
+  margin-bottom:10px;
+}
+
+.value{
+  font-size:32px;
+  font-weight:bold;
+}
+
+.status{
+  font-size:22px;
+  font-weight:bold;
+}
+
+.on{color:#16a34a;}
+.off{color:#dc2626;}
+
+button{
+  padding:8px 12px;
+  border:none;
+  border-radius:6px;
+  margin:3px;
+  cursor:pointer;
+}
+
+.green{background:#22c55e;color:white;}
+.red{background:#ef4444;color:white;}
+.blue{background:#3b82f6;color:white;}
+
+.voice{
+  background:#bbf7d0;
+  padding:5px 8px;
+  border-radius:15px;
+  font-size:12px;
+}
+
+/* CAMERA */
+#cam{
+  width:100%;
+  border-radius:10px;
+  display:none;
+}
+.grid{
+  flex:2;
+}
+
+.side{
+  flex:2;   /* make equal width */
+}
+#cam{
+  width:100%;
+  height:420px;   /* BIG change */
+  object-fit:cover;
+  border-radius:12px;
+}
+.side .card{
+  height:459.8;
+  justify-content:flex-start;
+  width: 90%;
+}
+
+
+/* MOBILE */
+@media(max-width:900px){
+  .main{flex-direction:column;}
+  .grid{
+    grid-template-columns:1fr;
+    grid-auto-rows:auto;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">🌾 SAATHI Smart Agriculture Dashboard</div>
+
+<div class="main">
+
+<!-- LEFT GRID -->
+<div class="grid">
+
+<div class="card">
+<h3>🌡 Temperature</h3>
+<div class="value" id="temp">-- °C</div>
+</div>
+
+<div class="card">
+<h3>💧 Humidity</h3>
+<div class="value" id="hum">-- %</div>
+</div>
+
+<div class="card">
+<h3>🌱 Soil Moisture</h3>
+<div class="value" id="soil">--</div>
+</div>
+
+<div class="card">
+<h3>🚿 Pump</h3>
+<div class="status" id="pump">--</div>
+<div>
+<button class="green" onclick="pumpOn()">ON</button>
+<button class="red" onclick="pumpOff()">OFF</button>
+<button class="blue" onclick="autoMode()">AUTO</button>
+</div>
+</div>
+
+<div class="card">
+<h3>🎤 SAATHI Voice</h3>
+<button class="green" onclick="startVoice()">Start</button>
+<p id="voiceText">Say something...</p>
+</div>
+
+<div class="card">
+<h3>🗣️ Commands</h3>
+<div style="display:flex; flex-wrap:wrap; gap:5px;">
+<span class="voice">Turn on pump</span>
+<span class="voice">Turn off pump</span>
+<span class="voice">Auto mode</span>
+<span class="voice">Temperature</span>
+<span class="voice">Humidity</span>
+<span class="voice">Soil </span>
+<span class="voice">Status</span>
+</div>
+</div>
+
+</div>
+
+<!-- RIGHT CAMERA -->
+<div class="side">
+<div class="card">
+<h3>📷 Live Monitoring</h3>
+<img id="cam" style="display:none;">
+<p id="camStatus">Connecting...</p>
+<button onclick="loadCam()" class="green">Refresh</button>
+</div>
+</div>
+
+</div>
+
+<script>
+
+// -------- CONFIG --------
+const espIP = "http://192.168.29.69";   
+const camIP = "http://192.168.29.182:81/stream"; 
+
+const readAPI = "BGIYTY8I1XZ54ILH";
+const channel = "3252160";
+
+// -------- CAMERA --------
+function loadCam() {
+
+  const img = document.getElementById("cam");
+  const status = document.getElementById("camStatus");
+
+  // Your ESP32-CAM stream URL
+  img.src = "http://192.168.29.182:81/stream";
+
+  img.onload = function () {
+    img.style.display = "block";
+    status.innerHTML = "Camera Live 🎥";
+    status.style.color = "green";
+  };
+
+  img.onerror = function () {
+    img.style.display = "none";
+    status.innerHTML = "Camera not connected ❌";
+    status.style.color = "red";
+  };
+}
+
+
+loadCam();
+
+// -------- SENSOR DATA --------
+function loadData(){
+
+  fetch(`https://api.thingspeak.com/channels/${channel}/feeds/last.json?api_key=${readAPI}`)
+  .then(res => res.json())
+  .then(data => {
+
+    console.log("ThingSpeak Data:", data);
+
+    document.getElementById("temp").innerText =
+      (data.field1 || "--") + " °C";
+
+    document.getElementById("hum").innerText =
+      (data.field2 || "--") + " %";
+
+    document.getElementById("soil").innerText =
+      (data.field3 || "--");
+
+  })
+  .catch(err => {
+    console.log("ThingSpeak Error:", err);
+  });
+
+}
+// -------- UPDATE PUMP UI --------
+function updatePumpUI(state){
+  let pump = document.getElementById("pump");
+
+  state = String(state).trim().toUpperCase(); // 🔥 STRONG FIX
+
+  console.log("UI UPDATE:", state);
+
+  if(state === "ON"){
+    pump.innerHTML = "<span class='on'>ON</span>";
+  }
+  else if(state === "OFF"){
+    pump.innerHTML = "<span class='off'>OFF</span>";
+  }
+  else{
+    pump.innerHTML = "UNKNOWN ❌"; // debug
+  }
+}
+
+// -------- DIRECT CONTROL --------
+function pumpOn(){
+  fetch(`${espIP}/ON`)
+  .then(res => res.text())
+  .then(data => {
+    console.log("ON response:", data);
+    updatePumpUI("ON");
+  })
+  .catch(err => console.log("ON Error:", err));
+}
+
+function pumpOff(){
+  fetch(`${espIP}/OFF`)
+  .then(res => res.text())
+  .then(data => {
+    console.log("OFF response:", data);
+    updatePumpUI("OFF");
+  })
+  .catch(err => console.log("OFF Error:", err));
+}
+
+// -------- STATUS SYNC --------
+function syncPump(){
+  fetch(`${espIP}/STATUS`)
+  .then(res => res.text())
+  .then(data => {
+
+    console.log("RAW STATUS:", data);
+
+    let state = String(data).trim().toUpperCase();
+
+    console.log("PROCESSED STATUS:", state);
+
+    if(state === "ON" || state === "OFF"){
+      updatePumpUI(state);
+    } else {
+      console.log("Invalid status from ESP ❌");
+    }
+
+  })
+  .catch(err => {
+    console.log("ESP not reachable ❌", err);
+  });
+}
+
+// every 2 sec
+setInterval(syncPump, 2000);
+
+// initial load
+window.onload = function () {
+  loadCam();
+  loadData();
+  syncPump();
+};
+
+// -------- VOICE --------
+let recognition;
+
+if ('webkitSpeechRecognition' in window) {
+  recognition = new webkitSpeechRecognition();
+}
+
+recognition.lang = "en-US";
+
+function startVoice(){
+  recognition.start();
+}
+
+recognition.onresult = function(event){
+
+  let cmd = event.results[0][0].transcript.toLowerCase();
+  document.getElementById("voiceText").innerText = cmd;
+
+  if(cmd.includes("on")) pumpOn();
+  else if(cmd.includes("off")) pumpOff();
+};
+
+// -------- SPEAK --------
+function speak(text){
+  let speech = new SpeechSynthesisUtterance(text);
+  speech.lang = "en-US";
+  window.speechSynthesis.speak(speech);
+}
+
+</script>
+
+</body>
+</html>
